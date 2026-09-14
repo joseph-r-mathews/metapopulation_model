@@ -1,0 +1,23 @@
+# Local Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local assistant settings and credentials
+.claude/
+.codex/
+.agents/
+.env
+.env.*
+
+# Generated simulation datasets, checkpoints, and plots
+diffusion_data/
+diffusion_outputs/
+outputs/
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini
