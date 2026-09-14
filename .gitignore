@@ -21,3 +21,6 @@ outputs/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Local cleanup audit
+CLEANUP_REPORT.md
