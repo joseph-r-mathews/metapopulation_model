@@ -86,3 +86,24 @@ def weekly_summary(result):
 def observe(weekly_incidence, p_report, rng):
     """Independent binomial reporting, separate from disease dynamics."""
     return rng.binomial(weekly_incidence, p_report)
+
+
+def simulate_epidemic(theta, n_days, rng, *, N, M, I0, gamma, p_a,
+                      p_report, reporting_rng=None):
+    """Return one simulated epidemic and its MCMC-relevant truth in one dict.
+
+    Weekly arrays use the diffusion convention ``[state, week]``. ``X`` has
+    shape ``[day, state, compartment]``, with S/I/R on its final axis.
+    """
+    daily = simulate(theta, n_days, rng, N=N, M=M, I0=I0,
+                     gamma=gamma, p_a=p_a)
+    weekly = weekly_summary(daily)
+    reporting_rng = rng if reporting_rng is None else reporting_rng
+    Y = observe(weekly["incidence"], p_report, reporting_rng).T
+    return {
+        "X": np.stack((daily["S"], daily["I"], daily["R"]), axis=-1),
+        "Y": Y,
+        "local_foi": weekly["foi_local"].T,
+        "true_external_foi": weekly["foi_external"].T,
+        "true_beta": np.asarray(theta).copy(),
+    }
