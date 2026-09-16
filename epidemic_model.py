@@ -1,6 +1,5 @@
-"""Continuous deterministic metapopulation epidemic model.
+"""Authoritative continuous deterministic metapopulation epidemic model.
 
-This is the authoritative forward model for the square-root FPCA pipeline.
 External FoI always means the instantaneous continuous function h_i(t).
 """
 

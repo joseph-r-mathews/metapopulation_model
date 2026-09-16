@@ -12,30 +12,9 @@ __pycache__/
 .env
 .env.*
 
-# Generated simulation datasets, checkpoints, and plots
-diffusion_data/
-diffusion_outputs/
-outputs/
-weekly_data/
-deterministic_data/
-results/weekly_pipeline.log
-results/weekly_pipeline_errors.log
-results/deterministic_diffusion_pipeline.log
-results/deterministic_diffusion_pipeline_errors.log
-results/deterministic_importance_pipeline.log
-results/deterministic_importance_pipeline_errors.log
-results/coherent_weekly_oracle_pipeline.log
-results/coherent_weekly_oracle_pipeline_errors.log
-results/functional_foi_preparation.log
-results/functional_foi_preparation_errors.log
-results/foi_sqrt_fpca_k16_pipeline.log
-results/foi_sqrt_fpca_k16_pipeline_errors.log
-results/foi_sqrt_fpca_k16_training_loss.csv
-results/FOI_SQRT_FPCA_K16_PIPELINE_COMPLETE
-
-# Historical binary weights are retained locally but are not part of the
-# active reproducible method. The current K=16 checkpoint remains tracked.
-archive/obsolete_checkpoints/*.pt
+# Generated inference output
+results/*
+!results/mobility_k2_partition.csv
 
 # Operating-system files
 .DS_Store
