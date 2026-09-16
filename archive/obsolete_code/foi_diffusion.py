@@ -10,14 +10,14 @@ from torch.nn import functional as F
 
 
 DEFAULT_CHECKPOINT = (
-    Path(__file__).resolve().parent / "checkpoints" / "foi_distributional_m4_best.pt"
+    Path(__file__).resolve().parent / "checkpoints" / "foi_distributional_m4_deterministic_best.pt"
 )
 
 
 def fit_transforms(foi_ext, Y):
     """Pool over training simulations/weeks, retaining one scale per state.
 
-    The log floor approximates exact zeros by 1e-10/day. exp is nonnegative
+    The log floor approximates exact zeros by 1e-10/week. exp is nonnegative
     everywhere, so reverse samples need no projection onto nonnegative curves.
     """
     log_foi = np.log(np.maximum(foi_ext, 1e-10))
@@ -163,6 +163,9 @@ def load_foi_model(checkpoint=DEFAULT_CHECKPOINT, *, device=None):
     saved = torch.load(Path(checkpoint), map_location="cpu", weights_only=True)
     expected = {
         "method": "distributional_energy",
+        "time_scale": "weekly",
+        "observation_model": "poisson",
+        "training_simulator": "deterministic_coupled_ode",
         "m": 4,
         "beta_energy": 1,
         "lambda_energy": 1,
@@ -179,7 +182,8 @@ def load_foi_model(checkpoint=DEFAULT_CHECKPOINT, *, device=None):
 
 
 def sample_external_foi(
-    Y, n_samples, checkpoint=DEFAULT_CHECKPOINT, *, device=None, seed=None
+    Y, n_samples, checkpoint=DEFAULT_CHECKPOINT, *, device=None, seed=None,
+    batch_size=64,
 ):
     """Sample physical external FoI given weekly observations.
 
@@ -189,6 +193,8 @@ def sample_external_foi(
     """
     if not isinstance(n_samples, int) or n_samples <= 0:
         raise ValueError("n_samples must be a positive integer")
+    if not isinstance(batch_size, int) or batch_size <= 0:
+        raise ValueError("batch_size must be a positive integer")
     observations = np.asarray(Y)
     single = observations.ndim == 2
     if single:
@@ -200,15 +206,20 @@ def sample_external_foi(
 
     model, stats, schedule = load_foi_model(checkpoint, device=device)
     condition = transform_y(observations, stats).to(next(model.parameters()).device)
-    batch = len(condition)
-    condition = condition.unsqueeze(0).expand(n_samples, -1, -1, -1)
-    condition = condition.reshape(n_samples * batch, 51, 52)
+    observation_batch = len(condition)
     generator = None
     if seed is not None:
         generator = torch.Generator(device=condition.device).manual_seed(seed)
-    transformed = sample(model, condition, schedule, generator=generator)
-    physical = inverse_transform(transformed.cpu().numpy(), stats)
-    physical = physical.reshape(n_samples, batch, 51, 52)
+    batches = []
+    for start in range(0, n_samples, batch_size):
+        count = min(batch_size, n_samples - start)
+        repeated = condition.unsqueeze(0).expand(count, -1, -1, -1)
+        repeated = repeated.reshape(count * observation_batch, 51, 52)
+        transformed = sample(model, repeated, schedule, generator=generator)
+        batches.append(inverse_transform(transformed.cpu().numpy(), stats).reshape(
+            count, observation_batch, 51, 52
+        ))
+    physical = np.concatenate(batches)
     if not np.isfinite(physical).all():
         raise FloatingPointError("Diffusion sampler returned nonfinite physical FoI")
     return physical[:, 0] if single else physical

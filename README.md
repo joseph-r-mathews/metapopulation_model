@@ -1,51 +1,53 @@
-# 51-state SIR and canonical external-FoI diffusion model
+# Continuous external-FoI diffusion
 
-This repository contains the stochastic 51-state metapopulation SIR simulator
-and one trained conditional distributional-diffusion model for weekly external
-force of infection (FoI).
+The active scientific model is the continuous deterministic coupled
+51-location epidemic ODE. Its instantaneous force of infection is
 
-The retained diffusion model is the m=4 model with energy exponent 1, lambda 1,
-and a 100-step cosine schedule. It was trained for 200 epochs; validation energy
-loss selected epoch 199 as the global best checkpoint.
-
-## Main files
-
-- `model.py`: population/mobility loading, SIR dynamics, exact local/external
-  FoI, weekly aggregation, reporting, and `simulate_epidemic`.
-- `generate_diffusion_data.py`: deterministic generation of the existing
-  20,000/2,000/2,000 train/validation/test simulation dataset.
-- `foi_diffusion.py`: transforms, Conv1d stochastic denoiser, fixed m=4 energy
-  loss, forward diffusion, reverse bridge sampler, checkpoint loader, and
-  `sample_external_foi`.
-- `run_experiments.py`: retained SIR numerical-check and plotting utility.
-
-Raw data remain at the project root because the unchanged epidemic data loader
-expects them there. The canonical cached dataset remains under `diffusion_data/`.
-
-## Sampling external FoI
-
-```python
-from foi_diffusion import sample_external_foi
-
-# Y has shape [51, 52]. The result is in physical FoI/day units.
-draws = sample_external_foi(Y, n_samples=2)
-assert draws.shape == (2, 51, 52)
+```text
+lambda_i(t) = a_i beta_i I_i(t)/N_i + h_i(t),
+a_i = 1 - (p_a/N_i) sum_{j != i} M_ij,
+h_i(t) = sum_{j != i} (p_a M_ij/N_i) beta_j I_j(t)/N_j.
 ```
 
-For batched observations shaped `[batch, 51, 52]`, the returned shape is
-`[n_samples, batch, 51, 52]`. CUDA is selected when available; pass
-`device="cpu"` to override it. No beta conditioning or MCMC is implemented.
+Weekly incidence is integrated by an ODE state,
+`mu[i,w] = C_i(w+1)-C_i(w)`, and observations follow
+`Y[i,w] ~ Poisson(p_report * mu[i,w])`. External FoI `h_i(t)` is always a
+continuous instantaneous function; there is no weekly-H target.
 
-The canonical checkpoint is `checkpoints/foi_distributional_m4_best.pt`.
-Final training metadata and reference posterior plots are in
-`results/final_distributional/`.
+The representation uses `z_i(t)=sqrt(h_i(t))`, a cubic B-spline fit, and a
+state-specific FPCA basis fixed at `K=16`. The diffusion target is the
+`C.shape=[51,16]` score matrix (816 dimensions). Physical curves are recovered
+as
 
-## Epidemic output for future MCMC work
+```text
+h_i(t) = [z_bar_i(t) + sum_{k=1}^16 C[i,k] phi_i,k(t)]^2.
+```
 
-`model.simulate_epidemic(...)` returns a plain dictionary containing `X`, `Y`,
-`local_foi`, `true_external_foi`, and `true_beta`. Weekly arrays use `[51, 52]`;
-`X` uses `[day, state, S/I/R]`.
+`sqrt_foi_diffusion.sample_external_foi(Y, n_samples)` returns posterior draws
+that are directly callable at arbitrary continuous times in `[0,52]`.
+`foi_basis.reconstruct_external_foi(C, t)` is the lower-level reconstruction
+function.
 
-Install the dependencies in `requirements.txt`. The existing dataset and
-checkpoint are already present; do not regenerate data or retrain merely to use
-the model.
+Commands:
+
+```powershell
+# Generate or reuse deterministic data
+.\.venv\Scripts\python.exe -u -B foi_pipeline.py data --workers 4
+
+# Fit the fixed basis and create K=16 targets
+.\.venv\Scripts\python.exe -u -B foi_pipeline.py prepare
+
+# Train the m=4, 100-step distributional diffusion (maximum 400 epochs,
+# best-validation checkpointing, early-stopping patience 50)
+.\.venv\Scripts\python.exe -u -B foi_pipeline.py train
+
+# Evaluate in physical continuous-FoI space
+.\.venv\Scripts\python.exe -u -B foi_pipeline.py evaluate
+
+# Run the complete pipeline; cleanup occurs only after evaluation succeeds
+.\.venv\Scripts\python.exe -u -B foi_pipeline.py all --workers 4
+```
+
+The active checkpoint is `checkpoints/foi_sqrt_fpca_k16_m4_best.pt`. The fixed
+basis is `checkpoints/foi_sqrt_fpca_k16_basis.npz`. Final metrics and the single
+summary figure are written under `results/`.

@@ -1,0 +1,3 @@
+The adjacent checkpoint predicts the obsolete weekly-integrated external-FoI
+target. Preserve it for provenance, but do not use it as a scientifically
+valid continuous instantaneous-FoI model.
