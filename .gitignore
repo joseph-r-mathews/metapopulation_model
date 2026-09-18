@@ -14,7 +14,7 @@ __pycache__/
 
 # Generated inference output
 results/*
-!results/mobility_k2_partition.csv
+checkpoints/
 
 # Operating-system files
 .DS_Store
